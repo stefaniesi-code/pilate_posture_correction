@@ -11,9 +11,9 @@ This project acts as a digital physical therapist, providing objective, immediat
 
 
 
-Technology Stack: \
--- Component	Purpose
--- Python	Core language for logic and processing.
--- OpenCV	Computer vision utilities and camera feed management.
--- Pose Estimation Library	Deep learning framework (e.g., Mediapipe, OpenPose, or custom model) for identifying 3D anatomical landmarks.
--- NumPy/Pandas	Data processing, storage, and feature engineering (calculating joint angles).
+Technology Stack: 
+- Component	Purpose 
+- Python	Core language for logic and processing. 
+- OpenCV	Computer vision utilities and camera feed management. 
+- Pose Estimation Library	Deep learning framework (e.g., Mediapipe, OpenPose, or custom model) for identifying 3D anatomical landmarks. 
+- NumPy/Pandas	Data processing, storage, and feature engineering (calculating joint angles).
