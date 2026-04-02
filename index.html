@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PPC · 普拉提姿势教练</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, -apple-system, sans-serif; background: #f5f4f0; color: #1a1a1a; }
+
+  .header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 20px; background: #fff; border-bottom: 1px solid #e8e6e0;
+    position: sticky; top: 0; z-index: 10;
+  }
+  .logo { display: flex; align-items: center; gap: 10px; }
+  .logo-icon {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: #f0eeea; border: 1px solid #e0ddd6;
+    display: flex; align-items: center; justify-content: center; font-size: 18px;
+  }
+  .logo-text { font-size: 15px; font-weight: 500; }
+  .logo-sub { font-size: 12px; color: #888; }
+  .status-pill {
+    font-size: 12px; padding: 5px 12px; border-radius: 99px;
+    background: #f0eeea; border: 1px solid #e0ddd6; color: #666;
+  }
+  .status-pill.live { background: #e8f5e0; color: #3a6e10; border-color: #b8d990; }
+
+  .main { display: grid; grid-template-columns: 1fr 320px; min-height: calc(100vh - 65px); }
+
+  .camera-section { padding: 20px; display: flex; flex-direction: column; gap: 16px; }
+
+  .camera-box {
+    background: #1a1a1a; border-radius: 14px;
+    overflow: hidden; position: relative; aspect-ratio: 4/3;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .camera-placeholder { display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; }
+  .cam-icon { font-size: 52px; }
+  .camera-placeholder p { font-size: 15px; color: #aaa; }
+  .camera-placeholder small { font-size: 12px; color: #666; }
+
+  #videoEl { display: none; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+  #overlayCanvas { display: none; position: absolute; inset: 0; width: 100%; height: 100%; transform: scaleX(-1); }
+
+  .analyzing-badge {
+    position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+    background: rgba(0,0,0,0.7); border-radius: 99px;
+    padding: 5px 14px; font-size: 12px; color: #fff; display: none;
+    backdrop-filter: blur(4px);
+  }
+  .analyzing-badge.visible { display: block; }
+
+  .timer-badge {
+    position: absolute; bottom: 12px; right: 12px;
+    background: rgba(0,0,0,0.5); border-radius: 8px;
+    padding: 4px 10px; font-size: 12px; color: #fff; display: none;
+  }
+  .timer-badge.visible { display: block; }
+
+  .camera-controls { display: flex; gap: 10px; flex-wrap: wrap; }
+  .btn {
+    padding: 9px 18px; border-radius: 8px; font-size: 13px; font-weight: 500;
+    cursor: pointer; border: 1px solid #d0cdc6; background: #fff; color: #1a1a1a;
+    transition: all 0.15s;
+  }
+  .btn:hover { background: #f5f4f0; }
+  .btn.primary { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
+  .btn.primary:hover { background: #333; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .pose-selector {
+    background: #fff; border: 1px solid #e8e6e0; border-radius: 12px; padding: 14px 16px;
+  }
+  .pose-selector h3 { font-size: 11px; font-weight: 600; color: #999; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.06em; }
+  .pose-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+  .chip {
+    padding: 6px 14px; border-radius: 99px; font-size: 13px; cursor: pointer;
+    border: 1px solid #e0ddd6; background: #f5f4f0; color: #555; transition: all 0.15s;
+  }
+  .chip.active { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
+  .chip:hover:not(.active) { background: #eceae4; }
+
+  .sidebar {
+    border-left: 1px solid #e8e6e0; background: #fff;
+    display: flex; flex-direction: column;
+  }
+  .sidebar-tabs { display: flex; border-bottom: 1px solid #e8e6e0; flex-shrink: 0; }
+  .tab {
+    flex: 1; padding: 13px 6px; font-size: 12px; font-weight: 500;
+    text-align: center; cursor: pointer; color: #999;
+    border-bottom: 2px solid transparent; transition: all 0.15s;
+  }
+  .tab.active { color: #1a1a1a; border-bottom-color: #1a1a1a; }
+
+  .tab-content { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+  .tab-panel { display: none; flex-direction: column; gap: 12px; }
+  .tab-panel.active { display: flex; }
+
+  .score-card { background: #f5f4f0; border-radius: 12px; padding: 16px 18px; }
+  .score-label { font-size: 11px; font-weight: 600; color: #999; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
+  .score-value { font-size: 36px; font-weight: 500; line-height: 1; }
+  .score-suffix { font-size: 16px; color: #aaa; font-weight: 400; }
+  .score-bar { margin-top: 10px; height: 5px; border-radius: 99px; background: #e0ddd6; overflow: hidden; }
+  .score-fill { height: 100%; border-radius: 99px; transition: width 0.8s cubic-bezier(.4,0,.2,1); background: #4a9020; }
+  .score-fill.mid { background: #c07010; }
+  .score-fill.bad { background: #c03030; }
+
+  .metrics-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .metric-card { background: #f5f4f0; border-radius: 10px; padding: 10px 12px; }
+  .metric-label { font-size: 11px; color: #999; margin-bottom: 4px; }
+  .metric-value { font-size: 20px; font-weight: 500; }
+  .metric-unit { font-size: 11px; color: #bbb; font-weight: 400; }
+  .metric-badge { font-size: 10px; padding: 1px 6px; border-radius: 4px; margin-left: 4px; }
+  .metric-badge.ok { background: #e8f5e0; color: #3a6e10; }
+  .metric-badge.warn { background: #fdf4e0; color: #7a4500; }
+
+  .feedback-area { display: flex; flex-direction: column; gap: 8px; }
+  .feedback-item {
+    padding: 11px 13px; border-radius: 10px; border: 1px solid #e8e6e0;
+    font-size: 13px; line-height: 1.55;
+  }
+  .feedback-item.warn { background: #fdf4e0; border-color: #f0c060; color: #7a4500; }
+  .feedback-item.good { background: #e8f5e0; border-color: #b0d880; color: #2a5a00; }
+  .feedback-item.info { background: #f5f4f0; color: #666; border-color: #e8e6e0; }
+  .feedback-tag { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 4px; opacity: 0.65; }
+
+  .chat-wrap { display: flex; flex-direction: column; height: 100%; gap: 10px; }
+  .chat-messages { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; max-height: 400px; }
+  .message { padding: 10px 13px; border-radius: 10px; font-size: 13px; line-height: 1.6; }
+  .message.ai { background: #f5f4f0; color: #1a1a1a; }
+  .message.user { background: #1a1a1a; color: #fff; align-self: flex-end; max-width: 88%; border-radius: 10px 10px 2px 10px; }
+  .message.loading { color: #aaa; font-style: italic; background: #f5f4f0; }
+
+  .chat-input-row { display: flex; gap: 8px; padding-top: 10px; border-top: 1px solid #e8e6e0; }
+  .chat-input {
+    flex: 1; padding: 9px 11px; border-radius: 8px;
+    border: 1px solid #d0cdc6; background: #fff; color: #1a1a1a;
+    font-size: 13px; font-family: inherit; outline: none; resize: none;
+    transition: border-color 0.15s;
+  }
+  .chat-input:focus { border-color: #888; }
+  .chat-send {
+    padding: 9px 14px; border-radius: 8px; background: #1a1a1a; color: #fff;
+    border: none; cursor: pointer; font-size: 13px; font-weight: 500; align-self: flex-end;
+  }
+  .chat-send:hover { background: #333; }
+
+  .pose-guide { display: flex; flex-direction: column; gap: 8px; }
+  .guide-item {
+    display: flex; align-items: flex-start; gap: 10px; padding: 11px 13px;
+    border: 1px solid #e8e6e0; border-radius: 10px; cursor: pointer; transition: background 0.15s;
+  }
+  .guide-item:hover { background: #f5f4f0; }
+  .guide-icon {
+    width: 38px; height: 38px; border-radius: 8px; background: #f0eeea;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 18px;
+  }
+  .guide-title { font-size: 13px; font-weight: 500; margin-bottom: 3px; }
+  .guide-desc { font-size: 12px; color: #999; line-height: 1.4; }
+
+  .history-bar {
+    background: #fff; border: 1px solid #e8e6e0; border-radius: 12px;
+    padding: 12px 16px; display: flex; gap: 6px; align-items: center;
+  }
+  .history-bar span { font-size: 11px; color: #999; margin-right: 4px; flex-shrink: 0; }
+  .history-dot {
+    width: 28px; height: 28px; border-radius: 50%; background: #f0eeea;
+    border: 1px solid #e0ddd6; display: flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 600; cursor: default; flex-shrink: 0;
+  }
+  .history-dot.good { background: #e8f5e0; border-color: #b0d880; color: #3a6e10; }
+  .history-dot.mid { background: #fdf4e0; border-color: #f0c060; color: #7a4500; }
+  .history-dot.bad { background: #fde8e8; border-color: #f09090; color: #8a1010; }
+
+  @media (max-width: 720px) {
+    .main { grid-template-columns: 1fr; }
+    .sidebar { border-left: none; border-top: 1px solid #e8e6e0; min-height: 480px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">
+    <div class="logo-icon">🧘</div>
+    <div>
+      <div class="logo-text">PPC · Pilates Posture Coach</div>
+      <div class="logo-sub">AI 普拉提姿势纠正教练</div>
+    </div>
+  </div>
+  <div class="status-pill" id="statusPill">未连接摄像头</div>
+</div>
+
+<div class="main">
+  <div class="camera-section">
+    <div class="camera-box" id="cameraBox">
+      <video id="videoEl" autoplay muted playsinline></video>
+      <canvas id="overlayCanvas"></canvas>
+      <div class="camera-placeholder" id="cameraPlaceholder">
+        <div class="cam-icon">📹</div>
+        <p>点击"开启摄像头"开始分析</p>
+        <small>图像仅用于实时分析，不会上传储存</small>
+      </div>
+      <div class="analyzing-badge" id="analyzingBadge">✦ AI 分析中...</div>
+      <div class="timer-badge" id="timerBadge">8s</div>
+    </div>
+
+    <div class="camera-controls">
+      <button class="btn primary" id="startBtn" onclick="startCamera()">开启摄像头</button>
+      <button class="btn" id="stopBtn" onclick="stopCamera()" style="display:none;">关闭摄像头</button>
+      <button class="btn" onclick="analyzeNow()" id="analyzeBtn" style="display:none;" disabled>立即分析</button>
+    </div>
+
+    <div class="history-bar" id="historyBar">
+      <span>历史记录</span>
+      <div style="color:#ccc; font-size:12px;">开始分析后显示</div>
+    </div>
+
+    <div class="pose-selector">
+      <h3>当前练习动作</h3>
+      <div class="pose-chips">
+        <div class="chip active" onclick="selectPose(this,'The Hundred','百次拍打')">百次拍打</div>
+        <div class="chip" onclick="selectPose(this,'Roll Up','卷腹')">卷腹</div>
+        <div class="chip" onclick="selectPose(this,'Single Leg Stretch','单腿伸展')">单腿伸展</div>
+        <div class="chip" onclick="selectPose(this,'Plank','平板支撑')">平板支撑</div>
+        <div class="chip" onclick="selectPose(this,'Swan Dive','天鹅展翅')">天鹅展翅</div>
+        <div class="chip" onclick="selectPose(this,'Spine Stretch','脊椎伸展')">脊椎伸展</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sidebar">
+    <div class="sidebar-tabs">
+      <div class="tab active" onclick="switchTab(this,'analysis')">实时分析</div>
+      <div class="tab" onclick="switchTab(this,'coach')">AI 教练</div>
+      <div class="tab" onclick="switchTab(this,'guide')">动作指南</div>
+    </div>
+
+    <div class="tab-content">
+      <!-- Analysis Tab -->
+      <div class="tab-panel active" id="panel-analysis">
+        <div class="score-card">
+          <div class="score-label">综合姿势评分</div>
+          <div class="score-value" id="scoreVal">--<span class="score-suffix"></span></div>
+          <div class="score-bar"><div class="score-fill" id="scoreBar" style="width:0%"></div></div>
+        </div>
+
+        <div class="metrics-grid">
+          <div class="metric-card">
+            <div class="metric-label">脊椎角度</div>
+            <div class="metric-value" id="mSpine">--<span class="metric-unit">°</span></div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">肩膀水平</div>
+            <div class="metric-value" id="mShoulder">--<span class="metric-unit">°</span></div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">骨盆倾斜</div>
+            <div class="metric-value" id="mPelvis">--<span class="metric-unit">°</span></div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">颈部位置</div>
+            <div class="metric-value" id="mNeck">--<span class="metric-unit">°</span></div>
+          </div>
+        </div>
+
+        <div class="feedback-area" id="feedbackArea">
+          <div class="feedback-item info">
+            <div class="feedback-tag">提示</div>
+            开启摄像头后，AI 将每 8 秒自动分析一次您的姿势，也可手动触发。
+          </div>
+        </div>
+      </div>
+
+      <!-- Coach Tab -->
+      <div class="tab-panel" id="panel-coach">
+        <div class="chat-wrap">
+          <div class="chat-messages" id="chatMessages">
+            <div class="message ai">你好！我是你的 AI 普拉提教练 👋<br><br>开启摄像头后，我会实时分析你的姿势。你也可以直接问我普拉提相关的任何问题！</div>
+          </div>
+          <div class="chat-input-row">
+            <textarea class="chat-input" id="chatInput" rows="2" placeholder="问教练任何问题..." onkeydown="handleKey(event)"></textarea>
+            <button class="chat-send" onclick="sendChat()">发送</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Guide Tab -->
+      <div class="tab-panel" id="panel-guide">
+        <div class="pose-guide">
+          <div class="guide-item" onclick="askGuide('百次拍打 The Hundred')">
+            <div class="guide-icon">🌊</div>
+            <div><div class="guide-title">百次拍打</div><div class="guide-desc">核心激活 · 保持脊椎中立 · 下巴微收</div></div>
+          </div>
+          <div class="guide-item" onclick="askGuide('卷腹 Roll Up')">
+            <div class="guide-icon">🔄</div>
+            <div><div class="guide-title">卷腹</div><div class="guide-desc">逐节分离脊椎 · 避免借助惯性 · 均匀呼吸</div></div>
+          </div>
+          <div class="guide-item" onclick="askGuide('单腿伸展 Single Leg Stretch')">
+            <div class="guide-icon">🦵</div>
+            <div><div class="guide-title">单腿伸展</div><div class="guide-desc">稳定骨盆 · 对侧手放膝 · 保持腰椎中立</div></div>
+          </div>
+          <div class="guide-item" onclick="askGuide('平板支撑 Plank')">
+            <div class="guide-icon">⚡</div>
+            <div><div class="guide-title">平板支撑</div><div class="guide-desc">身体一直线 · 核心收紧 · 避免塌腰或翘臀</div></div>
+          </div>
+          <div class="guide-item" onclick="askGuide('天鹅展翅 Swan Dive')">
+            <div class="guide-icon">🕊️</div>
+            <div><div class="guide-title">天鹅展翅</div><div class="guide-desc">胸椎伸展 · 保护腰椎 · 肩胛骨下沉</div></div>
+          </div>
+          <div class="guide-item" onclick="askGuide('脊椎伸展 Spine Stretch')">
+            <div class="guide-icon">🌿</div>
+            <div><div class="guide-title">脊椎伸展</div><div class="guide-desc">坐骨着地 · 从头顶延伸 · 腹部收紧</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API_URL = '/api/claude'; // Netlify Edge Function proxy
+
+let currentPose = 'The Hundred';
+let currentPoseCN = '百次拍打';
+let stream = null;
+let analyzeInterval = null;
+let timerInterval = null;
+let chatHistory = [];
+let lastAnalysis = null;
+let scoreHistory = [];
+let isAnalyzing = false;
+
+function switchTab(el, name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('panel-' + name).classList.add('active');
+}
+
+function selectPose(el, pose, poseCN) {
+  document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  currentPose = pose;
+  currentPoseCN = poseCN;
+  document.getElementById('feedbackArea').innerHTML =
+    `<div class="feedback-item info"><div class="feedback-tag">切换动作</div>已切换到「${poseCN}」，等待下次分析...</div>`;
+}
+
+async function startCamera() {
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } }
+    });
+    const video = document.getElementById('videoEl');
+    video.srcObject = stream;
+    video.style.display = 'block';
+    document.getElementById('overlayCanvas').style.display = 'block';
+    document.getElementById('cameraPlaceholder').style.display = 'none';
+    document.getElementById('startBtn').style.display = 'none';
+    document.getElementById('stopBtn').style.display = 'inline-block';
+    document.getElementById('analyzeBtn').style.display = 'inline-block';
+    document.getElementById('analyzeBtn').disabled = false;
+    document.getElementById('statusPill').textContent = '摄像头已开启';
+    document.getElementById('statusPill').className = 'status-pill live';
+    document.getElementById('timerBadge').classList.add('visible');
+
+    startTimer();
+    setTimeout(autoAnalyze, 1800);
+  } catch (e) {
+    document.getElementById('feedbackArea').innerHTML =
+      `<div class="feedback-item warn"><div class="feedback-tag">错误</div>无法访问摄像头：${e.message}</div>`;
+  }
+}
+
+function startTimer() {
+  let countdown = 8;
+  document.getElementById('timerBadge').textContent = countdown + 's';
+  if (timerInterval) clearInterval(timerInterval);
+  if (analyzeInterval) clearInterval(analyzeInterval);
+
+  analyzeInterval = setInterval(() => {
+    countdown = 8;
+    autoAnalyze();
+  }, 8000);
+
+  timerInterval = setInterval(() => {
+    countdown--;
+    if (countdown <= 0) countdown = 8;
+    document.getElementById('timerBadge').textContent = countdown + 's';
+  }, 1000);
+}
+
+function stopCamera() {
+  if (stream) stream.getTracks().forEach(t => t.stop());
+  if (analyzeInterval) clearInterval(analyzeInterval);
+  if (timerInterval) clearInterval(timerInterval);
+  stream = null;
+
+  const video = document.getElementById('videoEl');
+  video.style.display = 'none';
+  video.srcObject = null;
+  document.getElementById('overlayCanvas').style.display = 'none';
+  document.getElementById('cameraPlaceholder').style.display = 'flex';
+  document.getElementById('startBtn').style.display = 'inline-block';
+  document.getElementById('stopBtn').style.display = 'none';
+  document.getElementById('analyzeBtn').style.display = 'none';
+  document.getElementById('timerBadge').classList.remove('visible');
+  document.getElementById('statusPill').textContent = '未连接摄像头';
+  document.getElementById('statusPill').className = 'status-pill';
+  document.getElementById('scoreVal').innerHTML = '--';
+  document.getElementById('scoreBar').style.width = '0%';
+  ['mSpine','mShoulder','mPelvis','mNeck'].forEach(id => {
+    document.getElementById(id).innerHTML = '--<span class="metric-unit">°</span>';
+  });
+}
+
+function captureFrame() {
+  const video = document.getElementById('videoEl');
+  if (!video.videoWidth) return null;
+  const canvas = document.createElement('canvas');
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  const ctx = canvas.getContext('2d');
+  ctx.translate(canvas.width, 0);
+  ctx.scale(-1, 1);
+  ctx.drawImage(video, 0, 0);
+  return canvas.toDataURL('image/jpeg', 0.82).split(',')[1];
+}
+
+async function analyzeNow() {
+  if (isAnalyzing) return;
+  if (analyzeInterval) clearInterval(analyzeInterval);
+  if (timerInterval) clearInterval(timerInterval);
+  await autoAnalyze();
+  startTimer();
+}
+
+async function autoAnalyze() {
+  if (isAnalyzing) return;
+  isAnalyzing = true;
+
+  const badge = document.getElementById('analyzingBadge');
+  const btn = document.getElementById('analyzeBtn');
+  badge.classList.add('visible');
+  if (btn) btn.disabled = true;
+
+  const frame = captureFrame();
+  const systemPrompt = `You are an expert Pilates instructor and biomechanics analyst. The user is doing the Pilates exercise: "${currentPose}" (${currentPoseCN}).
+
+Analyze their posture from the image and return ONLY a valid JSON object. No markdown, no backticks, no explanation outside the JSON.
+
+JSON structure:
+{
+  "score": <integer 0-100, be realistic and critical>,
+  "spineAngle": <integer 0-30, degrees deviation from neutral spine>,
+  "shoulderLevel": <integer 0-20, degrees of shoulder tilt>,
+  "pelvisTilt": <integer 0-25, degrees of anterior/posterior tilt>,
+  "neckPosition": <integer 0-20, degrees from neutral neck>,
+  "feedbacks": [
+    {"type": "good", "tag": "做得好", "text": "<specific Chinese positive feedback>"},
+    {"type": "warn", "tag": "需改善", "text": "<specific Chinese correction>"},
+    {"type": "info", "tag": "小建议", "text": "<specific Chinese tip>"}
+  ],
+  "summary": "<concise one-sentence Chinese summary of overall posture>"
+}
+
+Be specific about what you observe in the image. If image quality is poor or only face/upper body visible, note the limitation and give partial analysis.`;
+
+  const userContent = frame
+    ? [
+        { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: frame } },
+        { type: 'text', text: `请分析图中我做「${currentPoseCN}」时的姿势，返回JSON结果。` }
+      ]
+    : `我在做「${currentPoseCN}」，请给出典型的姿势分析示例（JSON格式）。`;
+
+  try {
+    const res = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: userContent }]
+      })
+    });
+
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const text = data.content.map(c => c.text || '').join('');
+    const clean = text.replace(/```json|```/g, '').trim();
+    const result = JSON.parse(clean);
+    lastAnalysis = result;
+    updateAnalysisUI(result);
+    addToHistory(result.score);
+  } catch (e) {
+    document.getElementById('feedbackArea').innerHTML =
+      `<div class="feedback-item warn"><div class="feedback-tag">连接错误</div>${e.message} — 请确认 Netlify 已配置 ANTHROPIC_API_KEY 环境变量</div>`;
+  }
+
+  badge.classList.remove('visible');
+  if (btn) btn.disabled = false;
+  isAnalyzing = false;
+}
+
+function updateAnalysisUI(r) {
+  const score = Math.round(r.score);
+  document.getElementById('scoreVal').innerHTML = score + '<span class="score-suffix"> / 100</span>';
+  const bar = document.getElementById('scoreBar');
+  bar.style.width = score + '%';
+  bar.className = 'score-fill' + (score >= 80 ? '' : score >= 60 ? ' mid' : ' bad');
+
+  const fmt = v => Math.abs(Math.round(v));
+  const badge = v => v <= 5 ? '<span class="metric-badge ok">正常</span>' : '<span class="metric-badge warn">偏高</span>';
+
+  document.getElementById('mSpine').innerHTML = fmt(r.spineAngle) + '<span class="metric-unit">°</span>' + badge(r.spineAngle);
+  document.getElementById('mShoulder').innerHTML = fmt(r.shoulderLevel) + '<span class="metric-unit">°</span>' + badge(r.shoulderLevel);
+  document.getElementById('mPelvis').innerHTML = fmt(r.pelvisTilt) + '<span class="metric-unit">°</span>' + badge(r.pelvisTilt);
+  document.getElementById('mNeck').innerHTML = fmt(r.neckPosition) + '<span class="metric-unit">°</span>' + badge(r.neckPosition);
+
+  const html = (r.feedbacks || []).map(f =>
+    `<div class="feedback-item ${f.type}"><div class="feedback-tag">${f.tag}</div>${f.text}</div>`
+  ).join('');
+  document.getElementById('feedbackArea').innerHTML = html || '<div class="feedback-item info">分析完成</div>';
+}
+
+function addToHistory(score) {
+  scoreHistory.push(score);
+  if (scoreHistory.length > 8) scoreHistory.shift();
+
+  const bar = document.getElementById('historyBar');
+  const cls = s => s >= 80 ? 'good' : s >= 60 ? 'mid' : 'bad';
+  bar.innerHTML = '<span>历史</span>' + scoreHistory.map(s =>
+    `<div class="history-dot ${cls(s)}" title="${s}分">${s}</div>`
+  ).join('');
+}
+
+async function sendChat() {
+  const input = document.getElementById('chatInput');
+  const msg = input.value.trim();
+  if (!msg) return;
+  input.value = '';
+
+  const el = document.getElementById('chatMessages');
+  el.innerHTML += `<div class="message user">${msg}</div>`;
+  const loading = document.createElement('div');
+  loading.className = 'message loading';
+  loading.textContent = '教练正在思考...';
+  el.appendChild(loading);
+  el.scrollTop = el.scrollHeight;
+
+  const ctx = lastAnalysis
+    ? `当前动作：「${currentPoseCN}」，最新评分：${lastAnalysis.score}分。${lastAnalysis.summary}`
+    : `当前动作：「${currentPoseCN}」`;
+
+  chatHistory.push({ role: 'user', content: msg });
+
+  try {
+    const res = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 800,
+        system: `你是专业的普拉提教练和运动康复专家，精通人体生物力学。用温和鼓励的语气用中文回答，简洁专业，回答控制在120字以内。背景信息：${ctx}`,
+        messages: chatHistory.slice(-8)
+      })
+    });
+    const data = await res.json();
+    const reply = data.content.map(c => c.text || '').join('');
+    chatHistory.push({ role: 'assistant', content: reply });
+    loading.className = 'message ai';
+    loading.textContent = reply;
+  } catch (e) {
+    loading.className = 'message ai';
+    loading.textContent = '抱歉，连接出现问题，请稍后重试。';
+  }
+  el.scrollTop = el.scrollHeight;
+}
+
+function askGuide(pose) {
+  const tabs = document.querySelectorAll('.tab');
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  tabs.forEach(t => t.classList.remove('active'));
+  tabs[1].classList.add('active');
+  document.getElementById('panel-coach').classList.add('active');
+  document.getElementById('chatInput').value = `请详细讲解「${pose}」的标准姿势要点、呼吸节奏和常见错误纠正方法。`;
+  sendChat();
+}
+
+function handleKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); }
+}
+</script>
+</body>
+</html>
